@@ -1,0 +1,145 @@
+import kotlin.random.Random
+import java.io.File
+
+var cards = emptyArray<Card>()
+var logList = mutableListOf<String>()
+data class Card(val term: String, val def: String, var mis: Int = 0) {
+
+    override fun toString(): String {
+        return "$term:$def:$mis"
+    }
+}
+
+fun main(args: Array<String>) {
+    if (args.contains("-import")) importList(args[args.indexOf("-import") + 1])
+    while (true) {
+        logandprintln("\nInput the action (add, remove, import, export, ask, exit, log, hardest card, reset stats):")
+        when (readAndLogLine()) {
+            "add" -> add()
+            "remove" -> remove()
+            "import" -> {
+                logandprintln("File name:")
+                importList(readAndLogLine())
+            }
+            "export" -> {
+                logandprintln("File name:")
+                exportList(readAndLogLine())
+            }
+            "ask" -> ask()
+            "exit" -> {
+                if (args.contains("-export")) { exportList(args[args.indexOf("-export") + 1]) }
+                logandprintln("Bye bye!")
+                return
+            }
+            "log" -> log()
+            "hardest card" -> hardestCard()
+            "reset stats" -> resetStats()
+            else -> logandprintln("Unknown command")
+        }
+    }
+}
+fun add() {
+    logandprintln("The card:")
+    val newterm = readAndLogLine()
+    if (cards.any { it.term == newterm }) {
+        logandprintln("The card \"$newterm\" already exists.")
+        return
+    }
+    logandprintln("The definition of the card:")
+    val newdef = readAndLogLine()
+    if (cards.any{ it.def == newdef }) {
+        logandprintln("The definition \"$newdef\" already exists.")
+        return
+    }
+    cards += Card(newterm, newdef)
+    logandprintln("The pair (\"$newterm\":\"$newdef\") has been added.")
+}
+fun remove() {
+    logandprintln("Which card?")
+    val input = readAndLogLine()
+    if (cards.any{ it.term == input }) {
+        cards = cards.filter { it.term != input }.toTypedArray()
+        logandprintln("The card has been removed.")
+    } else logandprintln("Can't remove \"$input\": there is no such card.")
+}
+fun importList(filename:String) {
+    val flashCardFile = File(filename)
+    try {
+        flashCardFile.forEachLine {
+            val newterm = it.substringBefore(":")
+            val newdef = it.substringAfter(":").substringBefore(":")
+            val newmis = it.substringAfterLast(":").toInt()
+            cards = cards.filter { e -> e.term != newterm }.toTypedArray()
+            cards += Card(newterm, newdef, newmis)
+        }
+    } catch (e: Exception) { logandprintln("File not found."); return }
+    logandprintln("${flashCardFile.readLines().size} cards have been loaded.")
+}
+fun exportList(filename: String) {
+    File(filename).writeText(cards.joinToString("\n"))
+    logandprintln("${cards.size} cards have been saved.")
+}
+fun ask() {
+    logandprintln("How many times to ask?")
+    for (i in 1..readAndLogLine().toInt()) {
+        val n = Random.nextInt(0, cards.size)
+        logandprintln("Print the definition of \"${cards[n].term}\":")
+        val ans = readAndLogLine()
+        when {
+            cards[n].def == ans -> logandprintln("Correct!")
+            cards.any{ it.def == ans } -> {
+                val datone:Card ?= cards.find { it.def == ans }
+                cards[n].mis += 1
+                logandprintln("Wrong. The right answer is \"${cards[n].def}\", but your definition is correct for \"${datone!!.term}\".")
+            }
+            else -> { cards[n].mis += 1; logandprintln("Wrong. The right answer is \"${cards[n].def}\".") }
+        }
+    }
+}
+fun log() {
+    logandprintln("File name:")
+    File(readAndLogLine()).writeText(logList.joinToString("\n"))
+    logandprintln("The log has been saved.")
+}
+fun hardestCard() {
+    val hardestCardArray: MutableList<Card> = mutableListOf()
+    var maxmis = 0
+    cards.forEach { e ->
+        if (e.mis > maxmis) {
+            maxmis = e.mis
+            hardestCardArray.clear()
+            hardestCardArray += e
+        } else if (e.mis < maxmis) {
+            hardestCardArray.filter { it.mis >= maxmis }
+        } else if (e.mis > 0 && e.mis == maxmis) {
+        hardestCardArray += e
+        }
+    }
+    when (hardestCardArray.size) {
+        0 -> logandprintln("There are no cards with errors.")
+        1 -> logandprintln("The hardest card is \"${hardestCardArray[0].term}\"." +
+                " You have ${hardestCardArray[0].mis} errors answering it.")
+        else -> {
+            var terms = arrayOf<String>()
+            hardestCardArray.forEach {
+                terms += it.term
+            }
+            logandprintln("The hardest cards are " + 
+                    terms.joinToString(separator = ", ", transform = {"\"" + it +"\"" }, postfix = ".") +
+                    " You have ${hardestCardArray[0].mis} errors answering them.")
+        }
+    }
+}
+fun resetStats() {
+    cards.forEach { it.mis = 0 }
+    logandprintln("Card statistics have been reset")
+}
+fun logandprintln(that: String) {
+    logList = (logList + that) as MutableList<String>
+    println(that)
+}
+fun readAndLogLine():String {
+    val a = readLine()!!
+    logList = (logList + a) as MutableList<String>
+    return a
+}
